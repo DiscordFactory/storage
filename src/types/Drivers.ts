@@ -1,0 +1,1 @@
+export type Driver = 'PostgreSQL' | 'MySQL' | 'SQLite'
