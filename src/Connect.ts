@@ -1,11 +1,11 @@
-import path from 'path'
 import { fetch } from 'fs-recursive'
-import YAML from 'js-yaml'
-import { Connection, createConnection } from 'typeorm'
-import { Driver } from './types/Database'
+import { Connection } from 'typeorm'
 import Dispatcher from './Dispatcher'
 import { appRoot, files } from './helpers/Directory'
-import { filterEnvironment, validateEnvironment } from './helpers/Environment'
+import DriverManager from './DriverManager'
+import Yaml from './environments/Yaml'
+import Env from './environments/Env'
+import Json from "./environments/Json";
 
 export default class Connect {
   public static $instance: Connect
@@ -28,53 +28,28 @@ export default class Connect {
       .filter(([_, file]) => file.filename === 'environment' || file.extension === 'env')
       .map(([_, file]) => file)
 
-    const env = environments.find(file => file.extension === 'env')
+    const env = await new Env(environments)
+      .filter()
+      .run()
 
     if (env) {
-      const database = filterEnvironment('DATABASE')
-
-      validateEnvironment(database)
-
-      return {
-        type: env.extension,
-        path: env.path,
-        content: {
-          DATABASE: {
-            DRIVER: database?.DRIVER,
-            PATH: database?.PATH,
-          },
-        },
-      }
+      return env
     }
 
-    const json = environments.find(file => file.extension === 'json')
+    const json = await new Json(environments)
+      .filter()
+      .run()
+
     if (json) {
-      const content = await json.getContent('utf-8')
-      const parsedContent = JSON.parse(content!.toString())
-      const database = parsedContent?.DATABASE
-
-      validateEnvironment(database)
-
-      return {
-        type: json.extension,
-        path: json.path,
-        content: JSON.parse(content!.toString()),
-      }
+      return json
     }
 
-    const yaml = environments.find(file => file.extension === 'yaml' || file.extension === 'yml')
+    const yaml = await new Yaml(environments)
+      .filter()
+      .run()
+
     if (yaml) {
-      const content = await yaml.getContent('utf-8')
-      const parsedYAMLContent = YAML.parse(content!.toString())
-      const database = parsedYAMLContent?.DATABASE
-
-      validateEnvironment(database)
-
-      return {
-        type: yaml.extension,
-        path: yaml.path,
-        content: YAML.load(content!.toString()),
-      }
+      return yaml
     }
 
     throw new Error('Environment file is missing, please create one.')
@@ -89,7 +64,8 @@ export default class Connect {
     const migrationDispatcher = new Dispatcher(await files(appRoot))
     await migrationDispatcher.dispatch('migration')
 
-    this.connexion = await this.createConnection(
+    const driverManager = new DriverManager()
+    this.connexion = await driverManager.createConnection(
       environment.DATABASE.DRIVER,
       environment.DATABASE,
       modelDispatcher.items,
@@ -99,39 +75,5 @@ export default class Connect {
     // await connexion.runMigrations({
     //   transaction: 'each',
     // })
-  }
-
-  private async createConnection (driver: Driver, credentials: any, models: any[], migrations: any[]): Promise<Connection> {
-    const modelsInstance = models.map((model: any) => model.default)
-    const migrationsInstance = migrations.map((migration: any) => migration.file.path)
-    const drivers = {
-      MySQL: () => this.createMySQLConnexion(credentials, modelsInstance, migrationsInstance),
-      SQLite: () => this.createSQLiteConnexion(credentials, modelsInstance, migrationsInstance),
-      unknown: () => new Error('The requested database does not exist, please select a valid one.'),
-    }
-
-    return (drivers[driver] || drivers.unknown)()
-  }
-
-  private async createMySQLConnexion (credentials: any, models: any[], migrations: any[]): Promise<Connection> {
-    return createConnection({
-      type: 'mysql',
-      host: 'localhost',
-      port: 3306,
-      username: 'test',
-      password: 'test',
-      database: 'test',
-      entities: models,
-      migrations,
-    })
-  }
-
-  private async createSQLiteConnexion (credentials: any, models: any[], migrations: any[]): Promise<Connection> {
-    return createConnection({
-      type: 'sqlite',
-      database: path.join(process.cwd(), credentials.PATH),
-      entities: models,
-      migrations,
-    })
   }
 }
