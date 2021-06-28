@@ -1,24 +1,30 @@
 import File from 'fs-recursive/build/File'
 
 export default class Dispatcher {
-  public databaseModels: any[] = []
+  public items: any[] = []
   constructor (private files: Map<string, File>) {
   }
 
-  public async dispatch () {
-    this.databaseModels = await Promise.all(
+  public async dispatch (type: 'databaseModel' | 'migration') {
+    const models = await Promise.all(
       Array.from(this.files).map(async ([key, file]) => {
         const res = await import(file.path)
-        const fileType = new res.default().type
+
+        if (!res.default) {
+          return
+        }
+        const fileType = (new res.default()).type
         
-        if (fileType === 'databaseModel') {
+        if (res.default && fileType === type) {
           return {
             type: fileType,
             default: res.default,
             file,
           }
         }
-      }).filter(file => file),
+      }),
     )
+
+    this.items = models.filter(i => i)
   }
 }

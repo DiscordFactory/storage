@@ -4,9 +4,9 @@ import YAML from 'js-yaml'
 import { Connection, createConnection } from 'typeorm'
 import { Driver } from './types/Drivers'
 import Dispatcher from './Dispatcher'
+
 export default class Connect {
   public static $instance: Connect
-  public database = {}
 
   public static getInstance () {
     if (!this.$instance) {
@@ -27,9 +27,22 @@ export default class Connect {
       'utf-8',
       ['node_modules'])
 
-    const dispatcher = new Dispatcher(files)
-    await dispatcher.dispatch()
-    const connexion = await this.createConnection(environment.DATABASE.DRIVER, environment.DATABASE, dispatcher.databaseModels)
+    const modelDispatcher = new Dispatcher(files)
+    await modelDispatcher.dispatch('databaseModel')
+
+    const migrationDispatcher = new Dispatcher(files)
+    await migrationDispatcher.dispatch('migration')
+
+    const connexion = await this.createConnection(
+      environment.DATABASE.DRIVER,
+      environment.DATABASE,
+      modelDispatcher.items,
+      migrationDispatcher.items,
+    )
+
+    // await connexion.runMigrations({
+    //   transaction: 'each',
+    // })
   }
 
   public async loadEnvironment () {
@@ -74,16 +87,17 @@ export default class Connect {
     throw new Error('Environment file is missing, please create one.')
   }
 
-  private async createConnection (driver: Driver, credentials: any, models: any[]): Promise<Connection> {
+  private async createConnection (driver: Driver, credentials: any, models: any[], migrations: any[]): Promise<Connection> {
     const modelsInstance = models.map((model: any) => model.default)
+    const migrationsInstance = migrations.map((migration: any) => migration.file.path)
     const drivers = {
-      MySQL: () => this.createMySQLConnexion(credentials, modelsInstance),
-      SQLite: () => this.createSQLiteConnexion(credentials, modelsInstance),
+      MySQL: () => this.createMySQLConnexion(credentials, modelsInstance, migrationsInstance),
+      SQLite: () => this.createSQLiteConnexion(credentials, modelsInstance, migrationsInstance),
     }
     return drivers[driver]()
   }
 
-  private async createMySQLConnexion (credentials: any, models: any[]): Promise<Connection> {
+  private async createMySQLConnexion (credentials: any, models: any[], migrations: any[]): Promise<Connection> {
     return createConnection({
       type: 'mysql',
       host: 'localhost',
@@ -92,14 +106,18 @@ export default class Connect {
       password: 'test',
       database: 'test',
       entities: models,
+      migrations,
+      logging: true,
     })
   }
 
-  private async createSQLiteConnexion (credentials: any, models: any[]): Promise<Connection> {
+  private async createSQLiteConnexion (credentials: any, models: any[], migrations: any[]): Promise<Connection> {
     return createConnection({
       type: 'sqlite',
       database: path.join(process.cwd(), credentials.PATH),
       entities: models,
+      migrations,
+      logging: true,
     })
   }
 }
