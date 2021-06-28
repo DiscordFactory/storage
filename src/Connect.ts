@@ -4,8 +4,8 @@ import YAML from 'js-yaml'
 import { Connection, createConnection } from 'typeorm'
 import { Driver } from './types/Database'
 import Dispatcher from './Dispatcher'
-import { appRoot, files, root } from './helpers/Directory'
-import { filterEnvironment } from "./helpers/Environment";
+import { appRoot, files } from './helpers/Directory'
+import { filterEnvironment, validateEnvironment } from './helpers/Environment'
 
 export default class Connect {
   public static $instance: Connect
@@ -16,6 +16,68 @@ export default class Connect {
       this.$instance = new Connect()
     }
     return this.$instance
+  }
+
+  public async loadEnvironment () {
+    const environment = await fetch(process.cwd(),
+      ['env', 'json', 'yaml', 'yml'],
+      'utf-8',
+      ['node_modules'])
+
+    const environments = Array.from(environment.entries())
+      .filter(([_, file]) => file.filename === 'environment' || file.extension === 'env')
+      .map(([_, file]) => file)
+
+    const env = environments.find(file => file.extension === 'env')
+
+    if (env) {
+      const database = filterEnvironment('DATABASE')
+
+      validateEnvironment(database)
+
+      return {
+        type: env.extension,
+        path: env.path,
+        content: {
+          DATABASE: {
+            DRIVER: database?.DRIVER,
+            PATH: database?.PATH,
+          },
+        },
+      }
+    }
+
+    const json = environments.find(file => file.extension === 'json')
+    if (json) {
+      const content = await json.getContent('utf-8')
+      const parsedContent = JSON.parse(content!.toString())
+      const database = parsedContent?.DATABASE
+
+      validateEnvironment(database)
+
+      return {
+        type: json.extension,
+        path: json.path,
+        content: JSON.parse(content!.toString()),
+      }
+    }
+
+    const yaml = environments.find(file => file.extension === 'yaml' || file.extension === 'yml')
+    if (yaml) {
+      const content = await yaml.getContent('utf-8')
+      const parsedYAMLContent = YAML.parse(content!.toString())
+      const database = parsedYAMLContent?.DATABASE
+
+      validateEnvironment(database)
+
+      return {
+        type: yaml.extension,
+        path: yaml.path,
+        content: YAML.load(content!.toString()),
+      }
+    }
+
+    throw new Error('Environment file is missing, please create one.')
   }
 
   private async initialize () {
@@ -37,140 +99,6 @@ export default class Connect {
     // await connexion.runMigrations({
     //   transaction: 'each',
     // })
-  }
-
-  public async loadEnvironment () {
-    const environment = await fetch(process.cwd(),
-      ['env', 'json', 'yaml', 'yml'],
-      'utf-8',
-      ['node_modules'])
-
-    const environments = Array.from(environment.entries())
-      .filter(([_, file]) => file.filename === 'environment' || file.extension === 'env')
-      .map(([_, file]) => file)
-
-    const env = environments.find(file => file.extension === 'env')
-
-    if (env) {
-      const database = filterEnvironment('DATABASE')
-
-      if (database?.DRIVER !== 'SQLite'
-        && database?.DRIVER !== 'MySQL'
-        && database?.DRIVER !== 'PostgreSQL') {
-        throw new Error('Your database driver is not defined or isn\'t valid in your environment file.')
-      }
-
-      if (database.DRIVER === 'SQLite' && !database?.PATH) {
-        throw new Error('The path to your SQLite database is missing from your environment file.')
-      }
-
-      if (database.DRIVER === 'MySQL'
-        && !database?.HOST
-        && !database?.POST
-        && !database?.USERNAME
-        && !database?.NAME) {
-        throw new Error('Your database configuration is incomplete or invalid.')
-      }
-
-      if (database.DRIVER === 'PostgreSQL'
-        && !database?.HOST
-        && !database?.USERNAME
-        && !database?.POST
-        && !database?.NAME) {
-        throw new Error('Your database configuration is incomplete or invalid.')
-      }
-
-      return {
-        type: env.extension,
-        path: env.path,
-        content: {
-          DATABASE: {
-            DRIVER: database?.DRIVER,
-            PATH: database?.PATH,
-          },
-        },
-      }
-    }
-
-    const json = environments.find(file => file.extension === 'json')
-    if (json) {
-      const content = await json.getContent('utf-8')
-      const parsedContent = JSON.parse(content!.toString())
-      const database = parsedContent?.DATABASE
-
-      if (database.DRIVER !== 'SQLite'
-        && database.DRIVER !== 'MySQL'
-        && database.DRIVER !== 'PostgreSQL') {
-        throw new Error('Your database driver is not defined or isn\'t valid in your environment file.')
-      }
-
-      if (database.DRIVER === 'SQLite' && !database.PATH) {
-        throw new Error('The path to your SQLite database is missing from your environment file.')
-      }
-
-      if (database.DRIVER === 'MySQL'
-        && !database.HOST
-        && !database.POST
-        && !database.USERNAME
-        && !database.NAME) {
-        throw new Error('Your database configuration is incomplete or invalid.')
-      }
-
-      if (database.DRIVER === 'PostgreSQL'
-        && !database?.HOST
-        && !database?.USERNAME
-        && !database?.POST
-        && !database?.NAME) {
-        throw new Error('Your database configuration is incomplete or invalid.')
-      }
-
-      return {
-        type: json.extension,
-        path: json.path,
-        content: JSON.parse(content!.toString()),
-      }
-    }
-
-    const yaml = environments.find(file => file.extension === 'yaml' || file.extension === 'yml')
-    if (yaml) {
-      const content = await yaml.getContent('utf-8')
-      const parsedYAMLContent = YAML.parse(content!.toString())
-      const database = parsedYAMLContent?.DATABASE
-
-      if (database?.DRIVER !== 'SQLite'
-        && database.DRIVER !== 'MySQL'
-        && database.DRIVER !== 'PostgreSQL') {
-        throw new Error('Your database driver is not defined or isn\'t valid in your environment file.')
-      }
-
-      if (database?.DRIVER === 'SQLite' && !database.PATH) {
-        throw new Error('The path to your SQLite database is missing from your environment file.')
-      }
-
-      if (database?.DATABASE.DRIVER === 'MySQL'
-        && !database.HOST
-        && !database.POST
-        && !database.USERNAME
-        && !database.NAME) {
-        throw new Error('Your database configuration is incomplete or invalid.')
-      }
-
-      if (database.DRIVER === 'PostgreSQL'
-        && !database?.HOST
-        && !database?.USERNAME
-        && !database?.POST
-        && !database?.NAME) {
-        throw new Error('Your database configuration is incomplete or invalid.')
-      }
-
-      return {
-        type: yaml.extension,
-        path: yaml.path,
-        content: YAML.load(content!.toString()),
-      }
-    }
-
-    throw new Error('Environment file is missing, please create one.')
   }
 
   private async createConnection (driver: Driver, credentials: any, models: any[], migrations: any[]): Promise<Connection> {

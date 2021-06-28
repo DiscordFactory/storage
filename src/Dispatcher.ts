@@ -3,6 +3,7 @@ import { FileType } from './types/Database'
 
 export default class Dispatcher {
   public items: any[] = []
+
   constructor (private files: Map<string, File>) {
   }
 
@@ -15,7 +16,7 @@ export default class Dispatcher {
           return
         }
         const fileType = (new res.default()).type
-        
+
         if (res.default && fileType === type) {
           return {
             type: fileType,
