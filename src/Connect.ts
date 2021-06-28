@@ -5,7 +5,7 @@ import { appRoot, files } from './helpers/Directory'
 import DriverManager from './DriverManager'
 import Yaml from './environments/Yaml'
 import Env from './environments/Env'
-import Json from "./environments/Json";
+import Json from './environments/Json'
 
 export default class Connect {
   public static $instance: Connect
