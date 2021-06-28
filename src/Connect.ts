@@ -2,11 +2,13 @@ import path from 'path'
 import { fetch } from 'fs-recursive'
 import YAML from 'js-yaml'
 import { Connection, createConnection } from 'typeorm'
-import { Driver } from './types/Drivers'
+import { Driver } from './types/Database'
 import Dispatcher from './Dispatcher'
+import { appRoot, files, root } from './helpers/Directory'
 
 export default class Connect {
   public static $instance: Connect
+  public connexion!: Connection
 
   public static getInstance () {
     if (!this.$instance) {
@@ -18,22 +20,13 @@ export default class Connect {
   private async initialize () {
     const environment = YAML.load((await this.loadEnvironment()).content)
 
-    const root = process.env.NODE_ENV === 'production'
-      ? path.join(process.cwd(), 'build', 'src')
-      : path.join(process.cwd(), 'src')
+    const modelDispatcher = new Dispatcher(await files(appRoot))
+    await modelDispatcher.dispatch('model')
 
-    const files = await fetch(root,
-      [process.env.NODE_ENV === 'production' ? 'js' : 'ts'],
-      'utf-8',
-      ['node_modules'])
-
-    const modelDispatcher = new Dispatcher(files)
-    await modelDispatcher.dispatch('databaseModel')
-
-    const migrationDispatcher = new Dispatcher(files)
+    const migrationDispatcher = new Dispatcher(await files(appRoot))
     await migrationDispatcher.dispatch('migration')
 
-    const connexion = await this.createConnection(
+    this.connexion = await this.createConnection(
       environment.DATABASE.DRIVER,
       environment.DATABASE,
       modelDispatcher.items,
@@ -107,7 +100,6 @@ export default class Connect {
       database: 'test',
       entities: models,
       migrations,
-      logging: true,
     })
   }
 
@@ -117,7 +109,6 @@ export default class Connect {
       database: path.join(process.cwd(), credentials.PATH),
       entities: models,
       migrations,
-      logging: true,
     })
   }
 }
