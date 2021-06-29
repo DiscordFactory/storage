@@ -26,5 +26,4 @@ export default class MySQL extends BaseDriver {
       migrations: this.migrations,
     })
   }
-
 }

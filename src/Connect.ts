@@ -1,4 +1,3 @@
-import { fetch } from 'fs-recursive'
 import { Connection } from 'typeorm'
 import Dispatcher from './Dispatcher'
 import { appRoot, files } from './helpers/Directory'
@@ -6,6 +5,7 @@ import DriverManager from './DriverManager'
 import Yaml from './environments/Yaml'
 import Env from './environments/Env'
 import Json from './environments/Json'
+import { environment } from './helpers/Environment'
 
 export default class Connect {
   public static $instance: Connect
@@ -19,12 +19,7 @@ export default class Connect {
   }
 
   public async loadEnvironment () {
-    const environment = await fetch(process.cwd(),
-      ['env', 'json', 'yaml', 'yml'],
-      'utf-8',
-      ['node_modules'])
-
-    const environments = Array.from(environment.entries())
+    const environments = Array.from((await environment()).entries())
       .filter(([_, file]) => file.filename === 'environment' || file.extension === 'env')
       .map(([_, file]) => file)
 
@@ -55,7 +50,7 @@ export default class Connect {
     throw new Error('Environment file is missing, please create one.')
   }
 
-  private async initialize () {
+  public async initialize () {
     const environment = (await this.loadEnvironment()).content
 
     const modelDispatcher = new Dispatcher(await files(appRoot))
@@ -71,9 +66,5 @@ export default class Connect {
       modelDispatcher.items,
       migrationDispatcher.items,
     )
-
-    // await connexion.runMigrations({
-    //   transaction: 'each',
-    // })
   }
 }

@@ -11,19 +11,21 @@ export default class Dispatcher {
     const models = await Promise.all(
       Array.from(this.files).map(async ([key, file]) => {
         const res = await import(file.path)
-
         if (!res.default) {
           return
         }
-        const fileType = (new res.default()).type
 
-        if (res.default && fileType === type) {
-          return {
-            type: fileType,
-            default: res.default,
-            file,
+        try {
+          const fileType = (new res.default()).type
+  
+          if (res.default && fileType === type) {
+            return {
+              type: fileType,
+              default: res.default,
+              file,
+            }
           }
-        }
+        } catch (err) {}
       }),
     )
 

@@ -10,3 +10,6 @@ export {
   Migration,
   BaseSchema,
 }
+
+export * from './hooks/Migration'
+export * from './hooks/Database'
