@@ -1,11 +1,11 @@
 {
   "name": "@discord-factory/storage",
-  "version": "1.1.1",
+  "version": "1.2.1",
   "description": "",
   "main": "build/index.js",
   "author": "Baptiste Parmantier <baptiste.parmantier.pro@gmail.com>",
   "license": "MIT",
-  "repository": "git@github.com:DiscordFactory/Hook.git",
+  "repository": "git@github.com:DiscordFactory/storage.git",
   "keywords": [],
   "scripts": {
     "dev": "tsc --watch",
@@ -36,6 +36,7 @@
     "js-yaml": "^4.1.0",
     "ts-node": "^9.1.1",
     "typeorm": "^0.2.34",
+    "uuid": "^8.3.2",
     "yaml": "^1.10.2"
   },
   "ava": {
